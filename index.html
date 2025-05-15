@@ -1,0 +1,1832 @@
+<!DOCTYPE html>
+<html lang="nl">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Survey Analyse Dashboard</title>
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/css/materialize.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/icon?family=Material+Icons"
+      rel="stylesheet"
+    />
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@3.11.0/dist/tf.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/universal-sentence-encoder"></script>
+
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      body {
+        font-family: "Inter", sans-serif;
+        background-color: #f4f6f8;
+      }
+      .nav-wrapper {
+        /* For the main top navigation bar */
+        background-color: #1e88e5; /* Blue */
+      }
+      .tabs {
+        /* For the tab container itself */
+        background-color: #1e88e5; /* Blue */
+      }
+      .tabs .tab a {
+        background-color: #1e88e5; /* Blue */
+        color: rgba(
+          255,
+          255,
+          255,
+          0.9
+        ); /* White text for inactive tabs, slightly transparent */
+      }
+      .tabs .tab a:hover {
+        background-color: #1976d2; /* Slightly darker blue on hover */
+        color: #ffffff; /* Full white text on hover */
+      }
+      .tabs .tab a.active {
+        background-color: #1565c0; /* Darker Blue for active tab */
+        color: #ffffff; /* Full white text for active tab */
+      }
+      .tabs .indicator {
+        background-color: #ffeb3b; /* Yellow indicator */
+      }
+      .card,
+      .card-panel {
+        border-radius: 8px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+      }
+      .card-title {
+        font-weight: 500;
+      }
+      .chart-container {
+        position: relative;
+        margin: auto;
+        height: 300px;
+        width: 100%;
+        max-width: 600px;
+        padding-bottom: 20px;
+      }
+      .filter-controls,
+      .upload-section {
+        padding: 15px;
+        margin-bottom: 20px;
+        background-color: #ffffff;
+        border-radius: 8px;
+      }
+      .filter-controls .input-field {
+        margin-right: 15px;
+      }
+      .sample-responses ul {
+        list-style-type: disc;
+        padding-left: 20px;
+        max-height: 250px;
+        overflow-y: auto;
+        border: 1px solid #eee;
+        padding: 10px;
+        border-radius: 4px;
+      }
+      .sample-responses li {
+        padding: 8px;
+        border-bottom: 1px solid #eee;
+        font-size: 0.9em;
+      }
+      .sample-responses li:last-child {
+        border-bottom: none;
+      }
+      .btn,
+      .btn-large,
+      .btn-small,
+      .file-field .btn {
+        background-color: #1e88e5;
+        border-radius: 4px;
+      }
+      .btn:hover,
+      .btn-large:hover,
+      .btn-small:hover,
+      .file-field .btn:hover {
+        background-color: #1565c0;
+      }
+      .input-field label {
+        color: #1e88e5;
+      }
+      .input-field input[type="text"]:focus + label,
+      .input-field input[type="number"]:focus + label,
+      .input-field textarea:focus + label {
+        color: #1e88e5 !important;
+      }
+      .input-field input[type="text"]:focus,
+      .input-field input[type="number"]:focus,
+      .input-field textarea:focus {
+        border-bottom: 1px solid #1e88e5 !important;
+        box-shadow: 0 1px 0 0 #1e88e5 !important;
+      }
+
+      .topic-cluster-container {
+        padding: 10px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        margin-top: 10px;
+        background-color: #f9f9f9;
+        min-height: 100px;
+      }
+      .cluster-item {
+        margin-bottom: 15px;
+        padding: 10px;
+        background-color: #fff;
+        border: 1px solid #e0e0e0;
+        border-radius: 4px;
+      }
+      .cluster-item strong {
+        color: #1e88e5;
+        display: block;
+        margin-bottom: 5px;
+      }
+      .cluster-item .chip {
+        margin: 3px;
+        background-color: #e3f2fd;
+        color: #1565c0;
+        font-size: 0.85em;
+        padding: 5px 8px;
+        height: auto;
+        line-height: normal;
+      }
+      #excelUploadStatus {
+        margin-top: 10px;
+        font-style: italic;
+      }
+      #dataPreviewTableContainer {
+        max-height: 400px;
+        overflow: auto;
+        margin-top: 15px;
+      }
+      #dataPreviewTable th,
+      #dataPreviewTable td {
+        font-size: 0.85em;
+        padding: 8px;
+        white-space: nowrap;
+      }
+      #columnMappingList li {
+        font-size: 0.9em;
+        padding: 4px 0;
+      }
+
+      @media (max-width: 600px) {
+        .chart-container {
+          height: 250px;
+        }
+        .filter-controls .input-field {
+          width: 100%;
+          margin-right: 0;
+        }
+        .tabs .tab {
+          width: 100%;
+        }
+        #dataPreviewTable th,
+        #dataPreviewTable td {
+          white-space: normal;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <div class="nav-wrapper container">
+        <a href="#" class="brand-logo">Survey Analyse Dashboard</a>
+      </div>
+    </nav>
+
+    <div class="container">
+      <div class="row upload-section card-panel">
+        <div class="col s12">
+          <h5>
+            <i class="material-icons left">cloud_upload</i>Upload Excel Data
+          </h5>
+          <p>
+            Upload uw survey data als een Excel-bestand (.xlsx of .xls). De
+            eerste 5 kolommen (A-E) worden genegeerd. De app probeert
+            kolomkoppen vanaf kolom F automatisch te koppelen aan verwachte
+            datavelden.
+          </p>
+          <div class="file-field input-field">
+            <div class="btn">
+              <span>Kies Bestand</span>
+              <input type="file" id="excelUpload" accept=".xlsx, .xls" />
+            </div>
+            <div class="file-path-wrapper">
+              <input
+                class="file-path validate"
+                type="text"
+                placeholder="Upload uw Excel bestand"
+              />
+            </div>
+          </div>
+          <div id="excelUploadStatus">
+            Nog geen bestand geüpload. Standaard voorbeelddata wordt gebruikt.
+          </div>
+        </div>
+      </div>
+
+      <div class="row">
+        <div class="col s12">
+          <ul class="tabs">
+            <li class="tab col s12 m2">
+              <a class="active" href="#overview">Overzicht</a>
+            </li>
+            <li class="tab col s12 m2">
+              <a href="#contactExperience">Contact</a>
+            </li>
+            <li class="tab col s12 m2">
+              <a href="#futureService">Toekomst</a>
+            </li>
+            <li class="tab col s12 m2">
+              <a href="#preferences">Voorkeuren</a>
+            </li>
+            <li class="tab col s12 m2"><a href="#openFeedback">Feedback</a></li>
+            <li class="tab col s12 m2">
+              <a href="#dataPreview">Data Voorbeeld</a>
+            </li>
+          </ul>
+        </div>
+
+        <div id="overview" class="col s12">
+          <div class="card-panel">
+            <h5 class="card-title">Demografie & Algemene Scores</h5>
+            <div class="row">
+              <div class="col s12 m6 l4">
+                <div class="chart-container" style="height: 250px">
+                  <canvas id="genderChart"></canvas>
+                </div>
+              </div>
+              <div class="col s12 m6 l4">
+                <div class="chart-container" style="height: 250px">
+                  <canvas id="ageChart"></canvas>
+                </div>
+              </div>
+              <div class="col s12 m6 l4">
+                <div class="chart-container" style="height: 250px">
+                  <canvas id="branchChart"></canvas>
+                </div>
+              </div>
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="overallExperienceChart"></canvas>
+                </div>
+              </div>
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="recommendationScoreChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="contactExperience" class="col s12">
+          <div class="card-panel">
+            <h5 class="card-title">Beoordeling Contactmomenten (Schaal 1-5)</h5>
+            <div class="row">
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="receptionRatingChart"></canvas>
+                </div>
+              </div>
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="testDriveRatingChart"></canvas>
+                </div>
+              </div>
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="tradeInRatingChart"></canvas>
+                </div>
+              </div>
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="warrantyExplanationRatingChart"></canvas>
+                </div>
+              </div>
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="deliveryRatingChart"></canvas>
+                </div>
+              </div>
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="maintenanceExplanationRatingChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="futureService" class="col s12">
+          <div class="card-panel">
+            <h5 class="card-title">
+              Belang Toekomstige Service Aspecten (Gem. Score 1-5)
+            </h5>
+            <p>Praktische Aspecten:</p>
+            <div class="row">
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="practicalAspectsChart1"></canvas>
+                </div>
+              </div>
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="practicalAspectsChart2"></canvas>
+                </div>
+              </div>
+            </div>
+            <p>Emotionele Aspecten:</p>
+            <div class="row">
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="emotionalAspectsChart1"></canvas>
+                </div>
+              </div>
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="emotionalAspectsChart2"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="preferences" class="col s12">
+          <div class="card-panel">
+            <h5 class="card-title">Klantvoorkeuren</h5>
+            <div class="row">
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="contactMethodChart"></canvas>
+                </div>
+              </div>
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="warrantyDurationChart"></canvas>
+                </div>
+              </div>
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="warrantyExtrasChart"></canvas>
+                </div>
+              </div>
+              <div class="col s12 m6">
+                <div class="chart-container">
+                  <canvas id="warrantyPaymentChart"></canvas>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="openFeedback" class="col s12">
+          <div class="card-panel">
+            <h5 class="card-title">
+              Analyse Open Feedback (TF.js USE & K-Means Clustering)
+            </h5>
+            <div class="filter-controls row">
+              <div class="input-field col s12 m4">
+                <select id="feedbackQuestionSelect">
+                  <option value="tevredenheid" selected>Wat ging goed?</option>
+                  <option value="verbeterpunten">Wat kan beter?</option>
+                  <option value="aanbevelingReden">Reden aanbeveling?</option>
+                  <option value="waaromGarantie">
+                    Reden wel/niet garantie?
+                  </option>
+                  <option value="aanvullendeServiceOpties">
+                    Aanvullende service opties?
+                  </option>
+                </select>
+                <label>Kies Vraag</label>
+              </div>
+              <div class="input-field col s12 m3">
+                <input
+                  id="numClustersInput"
+                  type="number"
+                  value="3"
+                  min="2"
+                  max="7"
+                />
+                <label for="numClustersInput">Aantal Topics (Clusters)</label>
+              </div>
+              <div class="input-field col s12 m3">
+                <select id="filterDemographicVariable">
+                  <option value="all" selected>Alle respondenten</option>
+                  <option value="geslacht">Geslacht</option>
+                  <option value="leeftijd">Leeftijd</option>
+                  <option value="vestiging">Vestiging</option>
+                </select>
+                <label>Filter op Demografie</label>
+              </div>
+              <div class="input-field col s12 m2">
+                <select id="filterDemographicValue">
+                  <option value="all" selected>Alle waarden</option>
+                </select>
+                <label>Kies Waarde</label>
+              </div>
+              <div class="col s12">
+                <button
+                  id="analyzeFeedbackBtn"
+                  class="btn waves-effect waves-light"
+                >
+                  Analyseer Feedback
+                </button>
+              </div>
+            </div>
+
+            <h6>Geïdentificeerde Topics (Clusters van zinnen):</h6>
+            <div id="topicClustersContainer" class="topic-cluster-container">
+              <p class="center-align grey-text">
+                Klik op "Analyseer Feedback" om topics te clusteren. Dit kan
+                even duren.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div id="dataPreview" class="col s12">
+          <div class="card-panel">
+            <h5 class="card-title">Data Voorbeeld & Kolom Mapping</h5>
+            <p>
+              Hieronder ziet u een voorbeeld van de eerste 10 rijen van de
+              geladen data zoals de applicatie deze intern gebruikt, en hoe de
+              Excel kolomkoppen zijn gemapt.
+            </p>
+
+            <h6>Kolom Mapping:</h6>
+            <ul id="columnMappingList" class="collection with-header">
+              <li class="collection-header">
+                <h5>Excel Kop -> Interne Sleutel</h5>
+              </li>
+              <li class="collection-item grey-text">
+                Upload een Excel bestand om de mapping te zien.
+              </li>
+            </ul>
+
+            <h6>Data Rijen Voorbeeld:</h6>
+            <div id="dataPreviewTableContainer">
+              <table id="dataPreviewTable" class="striped responsive-table">
+                <thead></thead>
+                <tbody>
+                  <tr>
+                    <td colspan="100%" class="center-align grey-text">
+                      Upload een Excel bestand om data te zien.
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/materialize/1.0.0/js/materialize.min.js"></script>
+    <script>
+      let surveyData = [
+        {
+          geslacht: "Man",
+          leeftijd: "31 tot 40 jaar",
+          vestiging: "Arnhem",
+          redenContact: "Aankoop occasion",
+          ontvangst: 5,
+          proefrit: 4,
+          inruil: 3,
+          uitlegGarantie: 4,
+          aflevering: 5,
+          uitlegOnderhoud: 4,
+          contactNaAankoop: 3,
+          ervaring: 4,
+          tevredenheid:
+            "De snelle service en vriendelijke ontvangst waren super. Ook de uitleg was duidelijk.",
+          verbeterpunten:
+            "De prijs van de extra winterbanden was wat aan de hoge kant.",
+          aanbevelingScore: 7,
+          aanbevelingReden:
+            "Goede auto's, deskundig personeel, maar aftersales kan soms beter.",
+          opnieuwGebruikScore: 8,
+          belangSnelheidService: 5,
+          belangCommunicatie: 4,
+          belangDeskundigPersoneel: 5,
+          belangPrijsKwaliteit: 4,
+          belangGrootAanbod: 3,
+          belangAfspraakGemak: 4,
+          belangFlexibiliteit: 3,
+          belangPersoonlijkeAandacht: 5,
+          belangVertrouwen: 5,
+          belangWaarderingKlant: 4,
+          belangVriendelijkheid: 5,
+          belangPositieveSfeer: 4,
+          contactVoorkeur: ["Telefonisch", "App"],
+          garantieDuur: "2 jaar garantie",
+          garantieExtras: ["Pechhulp"],
+          garantieAanpasbaarheid: "Belangrijk",
+          garantieBetaling: "Eenmalig bedrag",
+          waaromGarantie: "Voor de zekerheid gekozen.",
+          aanvullendeServiceOpties: "Een leenauto bij onderhoud.",
+        },
+        {
+          geslacht: "Vrouw",
+          leeftijd: "41 tot 50 jaar",
+          vestiging: "Nijmegen",
+          redenContact: "Onderhoud of reparatie",
+          ontvangst: 4,
+          proefrit: null,
+          inruil: null,
+          uitlegGarantie: null,
+          aflevering: null,
+          uitlegOnderhoud: 5,
+          contactNaAankoop: 4,
+          ervaring: 5,
+          tevredenheid:
+            "Altijd duidelijke uitleg over het onderhoud en de kosten. Vriendelijk personeel.",
+          verbeterpunten:
+            "Wachttijden voor een afspraak zijn soms lang. Meer flexibiliteit zou fijn zijn.",
+          aanbevelingScore: 8,
+          aanbevelingReden:
+            "Betrouwbaar en kundig personeel. Ik voel me hier gewaardeerd.",
+          opnieuwGebruikScore: 7,
+          belangSnelheidService: 5,
+          belangCommunicatie: 5,
+          belangDeskundigPersoneel: 5,
+          belangPrijsKwaliteit: 3,
+          belangGrootAanbod: 2,
+          belangAfspraakGemak: 3,
+          belangFlexibiliteit: 4,
+          belangPersoonlijkeAandacht: 4,
+          belangVertrouwen: 5,
+          belangWaarderingKlant: 5,
+          belangVriendelijkheid: 5,
+          belangPositieveSfeer: 4,
+          contactVoorkeur: ["E-mail"],
+          garantieDuur: "Garantie met verlenging",
+          garantieExtras: ["Gratis APK", "Jaarlijkse check-ups"],
+          garantieAanpasbaarheid: "Minder belangrijk",
+          garantieBetaling: "Maandelijks bedrag",
+          waaromGarantie: "Niet gekozen, vond het te duur.",
+          aanvullendeServiceOpties: "Haal- en brengservice.",
+        },
+      ];
+      let lastRawHeaders = [];
+      let lastMappedHeaders = [];
+      let useModel = null; // To store the loaded Universal Sentence Encoder model
+
+      const dutchStopwords = [
+        "de",
+        "en",
+        "van",
+        "ik",
+        "te",
+        "dat",
+        "die",
+        "in",
+        "een",
+        "hij",
+        "het",
+        "niet",
+        "zijn",
+        "is",
+        "was",
+        "op",
+        "aan",
+        "met",
+        "als",
+        "voor",
+        "had",
+        "er",
+        "maar",
+        "om",
+        "hem",
+        "dan",
+        "zou",
+        "of",
+        "wat",
+        "mijn",
+        "men",
+        "dit",
+        "zo",
+        "door",
+        "over",
+        "ze",
+        "zich",
+        "nu",
+        "uw",
+        "hoe",
+        "daar",
+        "wie",
+        "wel",
+        "naar",
+        "kon",
+        "moet",
+        "ook",
+        "ons",
+        "deze",
+        "veel",
+        "want",
+        "nog",
+        "al",
+        "toch",
+        "zonder",
+        "kunnen",
+        "hun",
+        "heb",
+        "zelf",
+        "tot",
+        "uit",
+        "waarom",
+        "wij",
+        "zij",
+        "geen",
+        "omdat",
+        "altijd",
+        "wordt",
+        "weer",
+        "dus",
+        "doen",
+        "iets",
+        "worden",
+        "heeft",
+        "geweest",
+        "ben",
+        "geworden",
+        "zal",
+        "zei",
+        "mij",
+        "jou",
+        "jij",
+        "u",
+        "me",
+        "je",
+        "goed",
+        "goede",
+        "erg",
+        "heel",
+        "meer",
+        "minder",
+        "beetje",
+        "misschien",
+        "graag",
+        "echt",
+        "hier",
+        "alles",
+        "gewoon",
+        "even",
+        "ook",
+        "zou",
+        "kan",
+        "kunnen",
+        "moeten",
+        "willen",
+        "ga",
+        "gaat",
+        "ging",
+        "komen",
+        "kwam",
+        "doet",
+        "deed",
+        "hebben",
+        "hebt",
+        "had",
+        "hadden",
+        "zeggen",
+        "zei",
+        "nooit",
+        "vaak",
+        "soms",
+        "altijd",
+        "dus",
+        "verder",
+        "terug",
+        "mee",
+        "weg",
+        "welke",
+        "wat",
+        "wie",
+        "waar",
+        "waarom",
+        "wanneer",
+        "etc",
+        "enz",
+        "bijvoorbeeld",
+        "namelijk",
+        "a",
+        "b",
+        "c",
+        "d",
+        "e",
+        "f",
+        "g",
+        "h",
+        "i",
+        "j",
+        "k",
+        "l",
+        "m",
+        "n",
+        "o",
+        "p",
+        "q",
+        "r",
+        "s",
+        "t",
+        "v",
+        "w",
+        "x",
+        "y",
+        "z",
+      ];
+
+      let charts = {};
+
+      const headerMapping = {
+        "Wat is uw geslacht?": "geslacht",
+        "Wat is uw leeftijd?": "leeftijd",
+        "Bij welke vestiging heeft u uw occasion gekocht?": "vestiging",
+        "Wat was de reden voor uw laatste contact met B?": "redenContact",
+        "Hoe beoordeelt u de volgende onderdelen van uw contact met B?\n.Eerste ontvangst of begroeting":
+          "ontvangst",
+        "Hoe beoordeelt u de volgende onderdelen van uw contact met B?\n. Proefrit of bezichtiging van de auto":
+          "proefrit",
+        "Hoe beoordeelt u de volgende onderdelen van uw contact met B?\n. Inruilvoorstel of prijsbespreking":
+          "inruil",
+        "Hoe beoordeelt u de volgende onderdelen van uw contact met B?\n. Uitleg over garantiepakketten":
+          "uitlegGarantie",
+        "Hoe beoordeelt u de volgende onderdelen van uw contact met B?\n. Aflevering van de auto":
+          "aflevering",
+        "Hoe beoordeelt u de volgende onderdelen van uw contact met B?\n.Uitleg over onderhoud":
+          "uitlegOnderhoud",
+        "Hoe beoordeelt u de volgende onderdelen van uw contact met B?\n.Contact na aankoop":
+          "contactNaAankoop",
+        "Hoe zou u uw ervaring met B beoordelen?": "ervaring",
+        "Wat heeft B naar tevredenheid gedaan tijdens uw ervaring?":
+          "tevredenheid",
+        "Wat kan B verbeteren in uw ervaring?": "verbeterpunten",
+        "Hoe waarschijnlijk is het dat u B aanbeveelt aan vrienden, familie of collega’s?":
+          "aanbevelingScore",
+        "Kunt u toelichten waarom u B wel of niet zou aanbevelen?":
+          "aanbevelingReden",
+        "Hoe waarschijnlijk is het dat u in de toekomst opnieuw gebruikmaakt van onze diensten?":
+          "opnieuwGebruikScore",
+        "Hoe belangrijk zijn de volgende praktische aspecten voor u om in de toekomst opnieuw gebruik te maken van onze diensten?.Snelle en betrouwbare service bij onderhoud en reparatie":
+          "belangSnelheidService",
+        "Hoe belangrijk zijn de volgende praktische aspecten voor u om in de toekomst opnieuw gebruik te maken van onze diensten?. Transparante communicatie over kosten en werkzaamheden":
+          "belangCommunicatie",
+        "Hoe belangrijk zijn de volgende praktische aspecten voor u om in de toekomst opnieuw gebruik te maken van onze diensten?. Deskundig personeel met veel vakkennis":
+          "belangDeskundigPersoneel",
+        "Hoe belangrijk zijn de volgende praktische aspecten voor u om in de toekomst opnieuw gebruik te maken van onze diensten?. Aantrekkelijke prijs-kwaliteitverhouding":
+          "belangPrijsKwaliteit",
+        "Hoe belangrijk zijn de volgende praktische aspecten voor u om in de toekomst opnieuw gebruik te maken van onze diensten?. Groot en actueel aanbod van occasions":
+          "belangGrootAanbod",
+        "Hoe belangrijk zijn de volgende praktische aspecten voor u om in de toekomst opnieuw gebruik te maken van onze diensten?.Gemakkelijk en snel een afspraak kunnen maken":
+          "belangAfspraakGemak",
+        "Hoe belangrijk zijn de volgende praktische aspecten voor u om in de toekomst opnieuw gebruik te maken van onze diensten?. Flexibele openingstijden en planning":
+          "belangFlexibiliteit",
+        "Hoe belangrijk zijn de volgende emotionele aspecten voor u om in de toekomst opnieuw gebruik te maken van onze diensten?. Persoonlijke aandacht en klantgerichte benadering":
+          "belangPersoonlijkeAandacht",
+        "Hoe belangrijk zijn de volgende emotionele aspecten voor u om in de toekomst opnieuw gebruik te maken van onze diensten?. Vertrouwen in de betrouwbaarheid van B":
+          "belangVertrouwen",
+        "Hoe belangrijk zijn de volgende emotionele aspecten voor u om in de toekomst opnieuw gebruik te maken van onze diensten?. Gevoel dat ik als klant gewaardeerd word":
+          "belangWaarderingKlant",
+        "Hoe belangrijk zijn de volgende emotionele aspecten voor u om in de toekomst opnieuw gebruik te maken van onze diensten?. Vriendelijkheid en empathie van het personeel":
+          "belangVriendelijkheid",
+        "Hoe belangrijk zijn de volgende emotionele aspecten voor u om in de toekomst opnieuw gebruik te maken van onze diensten?. Een positieve, prettige sfeer in het contact":
+          "belangPositieveSfeer",
+        "Op welke manier heeft u het liefst contact met B?": "contactVoorkeur",
+        "Welke garantieduur spreekt u het meest aan bij de aankoop van een occasion?":
+          "garantieDuur",
+        "Wat voor extra’s vindt u belangrijk bij een garantiepakket?":
+          "garantieExtras",
+        "Hoe belangrijk vindt u de mogelijkheid om de garantievoorwaarden aan te passen aan uw persoonlijke wensen en behoeften?":
+          "garantieAanpasbaarheid",
+        "Hoe zou u het liefst betalen voor een jaar extra garantie?":
+          "garantieBetaling",
+        "Wat is de reden dat u wel of niet voor een garantiepakket hebt gekozen?":
+          "waaromGarantie",
+        "Welke aanvullende serviceopties vindt u belangrijk, los van garantie?":
+          "aanvullendeServiceOpties",
+      };
+
+      const numericKeys = [
+        "ontvangst",
+        "proefrit",
+        "inruil",
+        "uitlegGarantie",
+        "aflevering",
+        "uitlegOnderhoud",
+        "contactNaAankoop",
+        "ervaring",
+        "aanbevelingScore",
+        "opnieuwGebruikScore",
+        "belangSnelheidService",
+        "belangCommunicatie",
+        "belangDeskundigPersoneel",
+        "belangPrijsKwaliteit",
+        "belangGrootAanbod",
+        "belangAfspraakGemak",
+        "belangFlexibiliteit",
+        "belangPersoonlijkeAandacht",
+        "belangVertrouwen",
+        "belangWaarderingKlant",
+        "belangVriendelijkheid",
+        "belangPositieveSfeer",
+      ];
+      const multiSelectKeys = ["contactVoorkeur", "garantieExtras"];
+
+      document.addEventListener("DOMContentLoaded", async function () {
+        M.Tabs.init(document.querySelector(".tabs"));
+        M.FormSelect.init(document.querySelectorAll("select"));
+
+        document
+          .getElementById("excelUpload")
+          .addEventListener("change", handleExcelUpload);
+        document
+          .getElementById("analyzeFeedbackBtn")
+          .addEventListener("click", analyzeOpenFeedback);
+        document
+          .getElementById("filterDemographicVariable")
+          .addEventListener("change", populateDemographicFilterValues);
+
+        try {
+          M.toast({
+            html: "Universal Sentence Encoder model laden...",
+            displayLength: 3000,
+          });
+          useModel = await use.load();
+          M.toast({
+            html: "USE model succesvol geladen!",
+            classes: "green lighten-1",
+            displayLength: 3000,
+          });
+        } catch (err) {
+          console.error("Fout bij laden USE model:", err);
+          M.toast({
+            html: "Fout bij laden USE model. Feedback analyse is mogelijk beperkt.",
+            classes: "red darken-2",
+            displayLength: 6000,
+          });
+        }
+
+        initializeDashboard();
+      });
+
+      function initializeDashboard() {
+        populateDemographicFilterValues();
+        renderAllCharts();
+        renderDataPreview();
+      }
+
+      function renderAllCharts() {
+        renderOverviewCharts();
+        renderContactExperienceCharts();
+        renderFutureServiceCharts();
+        renderPreferencesCharts();
+      }
+
+      function getInternalKey(rawHeader) {
+        const trimmedHeader = String(rawHeader || "").trim();
+        if (headerMapping[trimmedHeader]) {
+          return headerMapping[trimmedHeader];
+        }
+        const normalizedHeader = trimmedHeader.replace(/\n/g, " ");
+        if (headerMapping[normalizedHeader]) {
+          return headerMapping[normalizedHeader];
+        }
+        for (const key in headerMapping) {
+          const firstLineOfMappedKey = key.split("\n")[0].trim();
+          if (trimmedHeader.startsWith(firstLineOfMappedKey)) {
+            return headerMapping[key];
+          }
+        }
+        return trimmedHeader.replace(/\W+/g, "_").toLowerCase();
+      }
+
+      function handleExcelUpload(event) {
+        const file = event.target.files[0];
+        const statusDiv = document.getElementById("excelUploadStatus");
+        if (file) {
+          statusDiv.textContent =
+            "Bezig met verwerken van " + file.name + "...";
+          const reader = new FileReader();
+          reader.onload = function (e) {
+            try {
+              const fileData = new Uint8Array(e.target.result);
+              const workbook = XLSX.read(fileData, { type: "array" });
+              const firstSheetName = workbook.SheetNames[0];
+              const worksheet = workbook.Sheets[firstSheetName];
+              const aoa = XLSX.utils.sheet_to_json(worksheet, {
+                header: 1,
+                raw: false,
+                defval: "",
+              });
+
+              if (aoa.length > 0) {
+                lastRawHeaders = aoa[0]
+                  .slice(5)
+                  .map((header) => String(header || "").trim());
+                lastMappedHeaders = lastRawHeaders.map((rh) =>
+                  getInternalKey(rh)
+                );
+
+                const dataRows = aoa.slice(1).map((row) => row.slice(5));
+
+                let jsonData = dataRows.map((rowArray) => {
+                  const obj = {};
+                  lastMappedHeaders.forEach((mappedHeader, index) => {
+                    if (mappedHeader && lastRawHeaders[index]) {
+                      obj[mappedHeader] = rowArray[index];
+                    }
+                  });
+                  return obj;
+                });
+
+                jsonData = jsonData.filter(
+                  (obj) =>
+                    Object.keys(obj).length > 0 &&
+                    Object.values(obj).some(
+                      (val) => val !== "" && val !== null && val !== undefined
+                    )
+                );
+
+                if (jsonData.length > 0) {
+                  surveyData = jsonData.map((row, index) => {
+                    const processedRow = { internal_id: index };
+                    for (const key in row) {
+                      const internalKey = key;
+                      if (numericKeys.includes(internalKey)) {
+                        const numVal = parseFloat(
+                          String(row[internalKey]).replace(",", ".")
+                        );
+                        processedRow[internalKey] = !isNaN(numVal)
+                          ? numVal
+                          : null;
+                      } else if (
+                        multiSelectKeys.includes(internalKey) &&
+                        typeof row[internalKey] === "string"
+                      ) {
+                        processedRow[internalKey] = row[internalKey]
+                          .split(/[,;]/)
+                          .map((s) => s.trim())
+                          .filter((s) => s !== "");
+                      } else {
+                        processedRow[internalKey] = row[internalKey];
+                      }
+                    }
+                    return processedRow;
+                  });
+
+                  let successfullyMappedCount = 0;
+                  lastMappedHeaders.forEach((h) => {
+                    if (
+                      Object.values(headerMapping).includes(h) ||
+                      numericKeys.includes(h) ||
+                      multiSelectKeys.includes(h)
+                    ) {
+                      successfullyMappedCount++;
+                    } else if (!h.includes("_")) {
+                      successfullyMappedCount++;
+                    }
+                  });
+
+                  statusDiv.textContent = `${file.name} succesvol geladen. ${surveyData.length} rijen gevonden (kolom A-E genegeerd). Ongeveer ${successfullyMappedCount} van ${lastRawHeaders.length} kolommen bruikbaar gemapt. Dashboard wordt bijgewerkt.`;
+                  statusDiv.style.color = "green";
+                  initializeDashboard();
+                } else {
+                  statusDiv.textContent =
+                    "Geen data gevonden in het Excel bestand na het negeren van kolom A-E en filteren van lege rijen.";
+                  statusDiv.style.color = "red";
+                  M.toast({
+                    html: "Geen bruikbare data in Excel.",
+                    classes: "orange darken-2",
+                  });
+                  lastRawHeaders = [];
+                  lastMappedHeaders = [];
+                  initializeDashboard();
+                }
+              } else {
+                statusDiv.textContent = "Het Excel bestand lijkt leeg te zijn.";
+                statusDiv.style.color = "red";
+                M.toast({
+                  html: "Excel bestand is leeg.",
+                  classes: "orange darken-2",
+                });
+                lastRawHeaders = [];
+                lastMappedHeaders = [];
+                initializeDashboard();
+              }
+            } catch (error) {
+              console.error("Error parsing Excel file:", error);
+              statusDiv.textContent =
+                "Fout bij het lezen van het Excel bestand. Controleer het formaat, de inhoud en zorg dat kolom F onwards data bevat.";
+              statusDiv.style.color = "red";
+              M.toast({
+                html: "Fout bij lezen Excel: " + error.message,
+                classes: "red darken-2",
+              });
+              lastRawHeaders = [];
+              lastMappedHeaders = [];
+              initializeDashboard();
+            }
+          };
+          reader.onerror = function () {
+            statusDiv.textContent = "Fout bij het lezen van het bestand.";
+            statusDiv.style.color = "red";
+            M.toast({
+              html: "Kon het bestand niet lezen.",
+              classes: "red darken-2",
+            });
+            lastRawHeaders = [];
+            lastMappedHeaders = [];
+            initializeDashboard();
+          };
+          reader.readAsArrayBuffer(file);
+        }
+      }
+
+      function renderDataPreview() {
+        const tableHead = document.querySelector("#dataPreviewTable thead");
+        const tableBody = document.querySelector("#dataPreviewTable tbody");
+        const mappingList = document.getElementById("columnMappingList");
+
+        if (!tableHead || !tableBody || !mappingList) return;
+
+        tableHead.innerHTML = "";
+        tableBody.innerHTML = "";
+        mappingList.innerHTML =
+          '<li class="collection-header"><h5>Excel Kop -> Interne Sleutel</h5></li>';
+
+        if (surveyData.length === 0 && lastRawHeaders.length === 0) {
+          tableBody.innerHTML =
+            '<tr><td colspan="100%" class="center-align grey-text">Upload een Excel bestand om data en mapping te zien.</td></tr>';
+          mappingList.innerHTML +=
+            '<li class="collection-item grey-text">Nog geen Excel bestand geladen.</li>';
+          return;
+        }
+
+        if (lastRawHeaders.length > 0) {
+          lastRawHeaders.forEach((rawHeader, index) => {
+            const mappedKey = lastMappedHeaders[index] || "NIET GEMAPT";
+            const listItem = document.createElement("li");
+            listItem.className = "collection-item";
+            listItem.innerHTML = `<b>${
+              rawHeader || "[Lege Kop]"
+            }</b> <i class="material-icons tiny">arrow_forward</i> ${mappedKey}`;
+            if (
+              mappedKey === "NIET GEMAPT" ||
+              mappedKey.startsWith(rawHeader.replace(/\W+/g, "_").toLowerCase())
+            ) {
+              listItem.classList.add("orange-text", "text-darken-2");
+            }
+            mappingList.appendChild(listItem);
+          });
+        } else {
+          mappingList.innerHTML +=
+            '<li class="collection-item grey-text">Geen kolomkoppen gevonden of bestand nog niet geladen.</li>';
+        }
+
+        if (surveyData.length > 0) {
+          const headers = Object.keys(surveyData[0]);
+          const trHead = document.createElement("tr");
+          headers.forEach((header) => {
+            const th = document.createElement("th");
+            th.textContent = header;
+            trHead.appendChild(th);
+          });
+          tableHead.appendChild(trHead);
+
+          const previewData = surveyData.slice(0, 10);
+          previewData.forEach((row) => {
+            const trBody = document.createElement("tr");
+            headers.forEach((header) => {
+              const td = document.createElement("td");
+              let cellValue = row[header];
+              if (Array.isArray(cellValue)) {
+                td.textContent = cellValue.join(", ");
+              } else if (cellValue === null || cellValue === undefined) {
+                td.textContent = "";
+              } else {
+                td.textContent = String(cellValue);
+              }
+              trBody.appendChild(td);
+            });
+            tableBody.appendChild(trBody);
+          });
+          if (previewData.length === 0) {
+            tableBody.innerHTML =
+              '<tr><td colspan="' +
+              (headers.length || 1) +
+              '" class="center-align grey-text">Geen data rijen gevonden in het bestand.</td></tr>';
+          }
+        } else {
+          tableBody.innerHTML =
+            '<tr><td colspan="100%" class="center-align grey-text">Geen data rijen om weer te geven. Controleer het Excel bestand.</td></tr>';
+        }
+      }
+
+      function destroyChart(chartId) {
+        if (charts[chartId]) {
+          charts[chartId].destroy();
+          delete charts[chartId];
+        }
+      }
+
+      function getCounts(data, key) {
+        const counts = {};
+        if (
+          !data ||
+          data.length === 0 ||
+          (data.length > 0 && !data[0].hasOwnProperty(key))
+        ) {
+          return counts;
+        }
+        data.forEach((item) => {
+          let value = item[key];
+          if (value === null || value === undefined) return;
+          if (Array.isArray(value)) {
+            value.forEach((v) => {
+              if (v !== null && v !== undefined && String(v).trim() !== "") {
+                counts[String(v).trim()] = (counts[String(v).trim()] || 0) + 1;
+              }
+            });
+          } else {
+            if (String(value).trim() !== "") {
+              counts[String(value).trim()] =
+                (counts[String(value).trim()] || 0) + 1;
+            }
+          }
+        });
+        return counts;
+      }
+
+      function getLikertCounts(data, key, scaleMin, scaleMax) {
+        const counts = Array(scaleMax - scaleMin + 1).fill(0);
+        const labels = Array.from({ length: scaleMax - scaleMin + 1 }, (_, i) =>
+          (i + scaleMin).toString()
+        );
+        let validResponses = 0;
+        if (
+          !data ||
+          data.length === 0 ||
+          (data.length > 0 && !data[0].hasOwnProperty(key))
+        ) {
+          return { counts, labels, validResponses };
+        }
+        data.forEach((item) => {
+          const value = parseFloat(String(item[key]).replace(",", "."));
+          if (!isNaN(value) && value >= scaleMin && value <= scaleMax) {
+            counts[Math.round(value) - scaleMin]++;
+            validResponses++;
+          }
+        });
+        return { counts, labels, validResponses };
+      }
+
+      function renderBarChart(
+        canvasId,
+        label,
+        dataCounts,
+        customLabels = null
+      ) {
+        destroyChart(canvasId);
+        const ctx = document.getElementById(canvasId)?.getContext("2d");
+        const chartContainer = document.getElementById(canvasId)?.parentElement;
+
+        if (!ctx || !chartContainer) return;
+
+        const noDataMsg = chartContainer.querySelector(".no-data-message");
+        if (noDataMsg) noDataMsg.remove();
+
+        const dataValues = Object.values(dataCounts);
+        if (dataValues.length === 0 || dataValues.every((v) => v === 0)) {
+          chartContainer.insertAdjacentHTML(
+            "afterbegin",
+            `<p class="center-align grey-text no-data-message" style="padding-top: 80px;">Geen data beschikbaar voor ${label}</p>`
+          );
+          return;
+        }
+
+        charts[canvasId] = new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: customLabels || Object.keys(dataCounts),
+            datasets: [
+              {
+                label: label,
+                data: dataValues,
+                backgroundColor: "rgba(30, 136, 229, 0.7)",
+                borderColor: "rgba(30, 136, 229, 1)",
+                borderWidth: 1,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              y: { beginAtZero: true, ticks: { stepSize: 1, precision: 0 } },
+            },
+            plugins: { legend: { display: true, position: "top" } },
+          },
+        });
+      }
+
+      function renderPieChart(canvasId, label, dataCounts) {
+        destroyChart(canvasId);
+        const ctx = document.getElementById(canvasId)?.getContext("2d");
+        const chartContainer = document.getElementById(canvasId)?.parentElement;
+
+        if (!ctx || !chartContainer) return;
+
+        const noDataMsg = chartContainer.querySelector(".no-data-message");
+        if (noDataMsg) noDataMsg.remove();
+
+        const dataValues = Object.values(dataCounts);
+        if (
+          Object.keys(dataCounts).length === 0 ||
+          dataValues.every((v) => v === 0)
+        ) {
+          chartContainer.insertAdjacentHTML(
+            "afterbegin",
+            `<p class="center-align grey-text no-data-message" style="padding-top: 80px;">Geen data beschikbaar voor ${label}</p>`
+          );
+          return;
+        }
+
+        const backgroundColors = [
+          "rgba(255, 99, 132, 0.7)",
+          "rgba(54, 162, 235, 0.7)",
+          "rgba(255, 206, 86, 0.7)",
+          "rgba(75, 192, 192, 0.7)",
+          "rgba(153, 102, 255, 0.7)",
+          "rgba(255, 159, 64, 0.7)",
+        ];
+        charts[canvasId] = new Chart(ctx, {
+          type: "pie",
+          data: {
+            labels: Object.keys(dataCounts),
+            datasets: [
+              {
+                label: label,
+                data: dataValues,
+                backgroundColor: backgroundColors,
+                borderColor: backgroundColors.map((color) =>
+                  color.replace("0.7", "1")
+                ),
+                borderWidth: 1,
+              },
+            ],
+          },
+          options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: { legend: { position: "right" } },
+          },
+        });
+      }
+
+      function renderOverviewCharts() {
+        if (!surveyData || surveyData.length === 0) {
+          [
+            "genderChart",
+            "ageChart",
+            "branchChart",
+            "overallExperienceChart",
+            "recommendationScoreChart",
+          ].forEach((id) => {
+            const container = document.getElementById(id)?.parentElement;
+            if (container) {
+              destroyChart(id);
+              const noDataMsg = container.querySelector(".no-data-message");
+              if (!noDataMsg)
+                container.insertAdjacentHTML(
+                  "afterbegin",
+                  `<p class="center-align grey-text no-data-message" style="padding-top: 80px;">Data wordt geladen...</p>`
+                );
+            }
+          });
+          return;
+        }
+        renderPieChart(
+          "genderChart",
+          "Geslacht",
+          getCounts(surveyData, "geslacht")
+        );
+        renderBarChart(
+          "ageChart",
+          "Leeftijd",
+          getCounts(surveyData, "leeftijd")
+        );
+        renderBarChart(
+          "branchChart",
+          "Vestiging",
+          getCounts(surveyData, "vestiging")
+        );
+
+        const overallExp = getLikertCounts(surveyData, "ervaring", 1, 5);
+        renderBarChart(
+          "overallExperienceChart",
+          "Algemene Ervaring (1-5)",
+          overallExp.counts,
+          overallExp.labels
+        );
+
+        const recommendScore = getLikertCounts(
+          surveyData,
+          "aanbevelingScore",
+          0,
+          10
+        );
+        renderBarChart(
+          "recommendationScoreChart",
+          "Aanbeveling Score (0-10)",
+          recommendScore.counts,
+          recommendScore.labels
+        );
+      }
+
+      function renderContactExperienceCharts() {
+        if (!surveyData || surveyData.length === 0) return;
+        const contactRatings = [
+          {
+            id: "receptionRatingChart",
+            key: "ontvangst",
+            label: "Ontvangst/Begroeting",
+          },
+          {
+            id: "testDriveRatingChart",
+            key: "proefrit",
+            label: "Proefrit/Bezichtiging",
+          },
+          {
+            id: "tradeInRatingChart",
+            key: "inruil",
+            label: "Inruilvoorstel/Prijs",
+          },
+          {
+            id: "warrantyExplanationRatingChart",
+            key: "uitlegGarantie",
+            label: "Uitleg Garantie",
+          },
+          {
+            id: "deliveryRatingChart",
+            key: "aflevering",
+            label: "Aflevering Auto",
+          },
+          {
+            id: "maintenanceExplanationRatingChart",
+            key: "uitlegOnderhoud",
+            label: "Uitleg Onderhoud",
+          },
+        ];
+        contactRatings.forEach((setting) => {
+          const data = getLikertCounts(surveyData, setting.key, 1, 5);
+          renderBarChart(
+            setting.id,
+            setting.label + " (1-5)",
+            data.counts,
+            data.labels
+          );
+        });
+      }
+
+      function renderGroupedBarChart(canvasId, title, datasetsConfig) {
+        destroyChart(canvasId);
+        const ctx = document.getElementById(canvasId)?.getContext("2d");
+        const chartContainer = document.getElementById(canvasId)?.parentElement;
+
+        if (!ctx || !chartContainer) return;
+
+        const noDataMsg = chartContainer.querySelector(".no-data-message");
+        if (noDataMsg) noDataMsg.remove();
+
+        if (!surveyData || surveyData.length === 0) {
+          chartContainer.insertAdjacentHTML(
+            "afterbegin",
+            `<p class="center-align grey-text no-data-message" style="padding-top: 80px;">Data wordt geladen voor ${title}</p>`
+          );
+          return;
+        }
+
+        const labels = datasetsConfig.map((dc) => dc.label);
+        const averages = datasetsConfig.map((dc) => {
+          if (surveyData.length > 0 && !surveyData[0].hasOwnProperty(dc.key)) {
+            return 0;
+          }
+          const values = surveyData
+            .map((item) => parseFloat(String(item[dc.key]).replace(",", ".")))
+            .filter((val) => !isNaN(val) && val >= 1 && val <= 5);
+          return values.length > 0
+            ? values.reduce((a, b) => a + b, 0) / values.length
+            : 0;
+        });
+
+        const validDataExists = averages.some((avg) => avg > 0);
+
+        if (!validDataExists) {
+          chartContainer.insertAdjacentHTML(
+            "afterbegin",
+            `<p class="center-align grey-text no-data-message" style="padding-top: 80px;">Geen data beschikbaar voor ${title}</p>`
+          );
+          return;
+        }
+
+        charts[canvasId] = new Chart(ctx, {
+          type: "bar",
+          data: {
+            labels: labels,
+            datasets: [
+              {
+                label: title + " (Gem. Score 1-5)",
+                data: averages,
+                backgroundColor: [
+                  "rgba(75, 192, 192, 0.7)",
+                  "rgba(255, 159, 64, 0.7)",
+                  "rgba(153, 102, 255, 0.7)",
+                  "rgba(255, 99, 132, 0.7)",
+                  "rgba(54, 162, 235, 0.7)",
+                  "rgba(255, 206, 86, 0.7)",
+                ],
+                borderColor: [
+                  "rgba(75, 192, 192, 1)",
+                  "rgba(255, 159, 64, 1)",
+                  "rgba(153, 102, 255, 1)",
+                  "rgba(255, 99, 132, 1)",
+                  "rgba(54, 162, 235, 1)",
+                  "rgba(255, 206, 86, 1)",
+                ],
+                borderWidth: 1,
+              },
+            ],
+          },
+          options: {
+            indexAxis: "y",
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+              x: {
+                beginAtZero: true,
+                min: 0,
+                max: 5,
+                ticks: { stepSize: 0.5, precision: 1 },
+              },
+            },
+            plugins: { legend: { display: true, position: "top" } },
+          },
+        });
+      }
+
+      function renderFutureServiceCharts() {
+        renderGroupedBarChart(
+          "practicalAspectsChart1",
+          "Praktische Aspecten (Deel 1)",
+          [
+            {
+              label: "Snelle/Betrouwbare Service",
+              key: "belangSnelheidService",
+            },
+            { label: "Transparante Communicatie", key: "belangCommunicatie" },
+            { label: "Deskundig Personeel", key: "belangDeskundigPersoneel" },
+          ]
+        );
+        renderGroupedBarChart(
+          "practicalAspectsChart2",
+          "Praktische Aspecten (Deel 2)",
+          [
+            { label: "Prijs-Kwaliteit", key: "belangPrijsKwaliteit" },
+            { label: "Groot Aanbod Occasions", key: "belangGrootAanbod" },
+            { label: "Gemak Afspraak Maken", key: "belangAfspraakGemak" },
+            { label: "Flexibele Openingstijden", key: "belangFlexibiliteit" },
+          ]
+        );
+        renderGroupedBarChart(
+          "emotionalAspectsChart1",
+          "Emotionele Aspecten (Deel 1)",
+          [
+            {
+              label: "Persoonlijke Aandacht",
+              key: "belangPersoonlijkeAandacht",
+            },
+            { label: "Vertrouwen in Bedrijf", key: "belangVertrouwen" },
+            { label: "Gevoel Gewaardeerd", key: "belangWaarderingKlant" },
+          ]
+        );
+        renderGroupedBarChart(
+          "emotionalAspectsChart2",
+          "Emotionele Aspecten (Deel 2)",
+          [
+            {
+              label: "Vriendelijkheid Personeel",
+              key: "belangVriendelijkheid",
+            },
+            { label: "Positieve Sfeer", key: "belangPositieveSfeer" },
+          ]
+        );
+      }
+
+      function renderPreferencesCharts() {
+        if (!surveyData || surveyData.length === 0) return;
+        renderBarChart(
+          "contactMethodChart",
+          "Voorkeur Contactmethode",
+          getCounts(surveyData, "contactVoorkeur")
+        );
+        renderPieChart(
+          "warrantyDurationChart",
+          "Voorkeur Garantieduur",
+          getCounts(surveyData, "garantieDuur")
+        );
+        renderBarChart(
+          "warrantyExtrasChart",
+          "Belangrijke Garantie Extra's",
+          getCounts(surveyData, "garantieExtras")
+        );
+        renderPieChart(
+          "warrantyPaymentChart",
+          "Voorkeur Betaling Extra Garantie",
+          getCounts(surveyData, "garantieBetaling")
+        );
+      }
+
+      function populateDemographicFilterValues() {
+        const filterVar = document.getElementById(
+          "filterDemographicVariable"
+        ).value;
+        const valueSelect = document.getElementById("filterDemographicValue");
+        valueSelect.innerHTML =
+          '<option value="all" selected>Alle waarden</option>';
+
+        if (filterVar !== "all" && surveyData && surveyData.length > 0) {
+          if (
+            surveyData.length > 0 &&
+            surveyData[0].hasOwnProperty(filterVar)
+          ) {
+            const uniqueValues = [
+              ...new Set(
+                surveyData
+                  .map((item) => item[filterVar])
+                  .filter((val) => val != null && String(val).trim() !== "")
+              ),
+            ];
+            uniqueValues.sort().forEach((val) => {
+              const option = document.createElement("option");
+              option.value = val;
+              option.textContent = val;
+              valueSelect.appendChild(option);
+            });
+          }
+        }
+        M.FormSelect.init(valueSelect);
+      }
+
+      // --- TensorFlow.js USE & K-Means Clustering ---
+      async function analyzeOpenFeedback() {
+        const questionKey = document.getElementById(
+          "feedbackQuestionSelect"
+        ).value;
+        const numClusters =
+          parseInt(document.getElementById("numClustersInput").value) || 3;
+        const filterVar = document.getElementById(
+          "filterDemographicVariable"
+        ).value;
+        const filterVal = document.getElementById(
+          "filterDemographicValue"
+        ).value;
+
+        const clustersContainer = document.getElementById(
+          "topicClustersContainer"
+        );
+        if (clustersContainer)
+          clustersContainer.innerHTML =
+            '<p class="center-align grey-text">Bezig met analyseren... Model laden & embeddings genereren kan even duren.</p>';
+
+        if (!useModel) {
+          M.toast({
+            html: "Universal Sentence Encoder model is nog niet geladen. Probeer het zo opnieuw.",
+            classes: "orange darken-2",
+            displayLength: 5000,
+          });
+          if (clustersContainer)
+            clustersContainer.innerHTML =
+              '<p class="center-align red-text">USE Model niet geladen. Feedback analyse kan niet starten.</p>';
+          return;
+        }
+
+        let filteredData = surveyData;
+        if (!filteredData || filteredData.length === 0) {
+          M.toast({
+            html: "Geen survey data beschikbaar voor analyse.",
+            classes: "orange darken-2",
+          });
+          if (clustersContainer)
+            clustersContainer.innerHTML = `<p class="center-align grey-text">Geen survey data geladen.</p>`;
+          return;
+        }
+
+        if (filterVar !== "all" && filterVal !== "all") {
+          if (surveyData[0].hasOwnProperty(filterVar)) {
+            filteredData = surveyData.filter(
+              (item) => String(item[filterVar]) === String(filterVal)
+            );
+          } else {
+            M.toast({
+              html: `Filter kolom "${filterVar}" niet gevonden.`,
+              classes: "orange darken-2",
+            });
+          }
+        }
+
+        if (
+          filteredData.length > 0 &&
+          !filteredData[0].hasOwnProperty(questionKey)
+        ) {
+          M.toast({
+            html: `Vraag kolom "${questionKey}" niet gevonden.`,
+            classes: "orange darken-2",
+          });
+          if (clustersContainer)
+            clustersContainer.innerHTML = `<p class="center-align grey-text">Kolom "${questionKey}" niet gevonden.</p>`;
+          return;
+        }
+
+        const originalTexts = filteredData
+          .map((item, index) => ({
+            internal_id: item.internal_id,
+            text: item[questionKey],
+          }))
+          .filter(
+            (item) =>
+              typeof item.text === "string" && item.text.trim().length > 5
+          );
+
+        if (clustersContainer) clustersContainer.innerHTML = "";
+
+        if (originalTexts.length < numClusters) {
+          if (clustersContainer)
+            clustersContainer.innerHTML = `<p class="center-align grey-text">Te weinig tekstdata voor ${numClusters} clusters (minimaal ${numClusters} responses nodig).</p>`;
+          return;
+        }
+
+        M.toast({ html: "Zin-embeddings genereren...", displayLength: 4000 });
+        const sentences = originalTexts.map((s) => s.text);
+        const embeddings = await useModel.embed(sentences);
+        const embeddingsArray = await embeddings.array();
+        tf.dispose(embeddings);
+
+        M.toast({
+          html: `K-Means clustering starten voor ${numClusters} topics...`,
+          displayLength: 4000,
+        });
+
+        try {
+          const clusters = simpleKMeans(
+            embeddingsArray,
+            originalTexts,
+            numClusters
+          );
+
+          if (!clusters || clusters.length === 0) {
+            if (clustersContainer)
+              clustersContainer.innerHTML =
+                '<p class="center-align grey-text">Clustering gaf geen resultaten.</p>';
+            return;
+          }
+
+          clusters.forEach((cluster, index) => {
+            const clusterDiv = document.createElement("div");
+            clusterDiv.className = "cluster-item";
+
+            const title = document.createElement("strong");
+            title.textContent = `Topic Cluster ${index + 1} (${
+              cluster.sentences.length
+            } zinnen):`;
+            clusterDiv.appendChild(title);
+
+            const sampleSize = Math.min(cluster.sentences.length, 3);
+            for (let i = 0; i < sampleSize; i++) {
+              const sentenceEl = document.createElement("div");
+              sentenceEl.className = "chip";
+              sentenceEl.textContent =
+                cluster.sentences[i].text.substring(0, 150) +
+                (cluster.sentences[i].text.length > 150 ? "..." : "");
+              clusterDiv.appendChild(sentenceEl);
+            }
+            if (clustersContainer) clustersContainer.appendChild(clusterDiv);
+          });
+          M.toast({
+            html: `Clustering voltooid. ${clusters.length} topics gevonden.`,
+            classes: "green lighten-1",
+          });
+        } catch (error) {
+          console.error("K-Means Clustering Error:", error);
+          if (clustersContainer)
+            clustersContainer.innerHTML = `<p class="center-align red-text">Fout tijdens clustering: ${error.message}.</p>`;
+          M.toast({
+            html: `Clustering Fout: ${error.message}`,
+            classes: "red darken-2",
+          });
+        }
+      }
+
+      function simpleKMeans(data, originalTexts, k, maxIterations = 20) {
+        if (data.length < k) return [];
+
+        function euclideanDistance(vec1, vec2) {
+          let sum = 0;
+          for (let i = 0; i < vec1.length; i++) {
+            sum += Math.pow(vec1[i] - vec2[i], 2);
+          }
+          return Math.sqrt(sum);
+        }
+
+        let centroids = [];
+        const usedIndices = new Set();
+        while (centroids.length < k && usedIndices.size < data.length) {
+          const randomIndex = Math.floor(Math.random() * data.length);
+          if (!usedIndices.has(randomIndex)) {
+            centroids.push([...data[randomIndex]]);
+            usedIndices.add(randomIndex);
+          }
+        }
+        if (centroids.length < k) {
+          console.warn(
+            "KMeans: Not enough unique data points to initialize K centroids. Reducing K."
+          );
+          k = centroids.length;
+          if (k === 0) return [];
+        }
+
+        let assignments = new Array(data.length);
+        let clusters;
+
+        for (let iter = 0; iter < maxIterations; iter++) {
+          clusters = Array.from({ length: k }, () => ({
+            sentences: [],
+            centroid: [],
+          }));
+
+          for (let i = 0; i < data.length; i++) {
+            let minDist = Infinity;
+            let closestCentroidIndex = -1;
+            for (let j = 0; j < k; j++) {
+              if (!centroids[j]) continue; // Skip if centroid is undefined (e.g. k reduced)
+              const dist = euclideanDistance(data[i], centroids[j]);
+              if (dist < minDist) {
+                minDist = dist;
+                closestCentroidIndex = j;
+              }
+            }
+            assignments[i] = closestCentroidIndex;
+            if (closestCentroidIndex !== -1 && clusters[closestCentroidIndex]) {
+              clusters[closestCentroidIndex].sentences.push(originalTexts[i]);
+            }
+          }
+
+          let newCentroids = [];
+          let centroidsChanged = false;
+          for (let j = 0; j < k; j++) {
+            const clusterPointsIndices = assignments
+              .map((cIdx, pIdx) => (cIdx === j ? pIdx : -1))
+              .filter((pIdx) => pIdx !== -1);
+            const clusterPoints = clusterPointsIndices.map(
+              (pIdx) => data[pIdx]
+            );
+
+            if (clusterPoints.length > 0) {
+              const newCentroid = new Array(data[0].length).fill(0);
+              for (const point of clusterPoints) {
+                for (let dim = 0; dim < point.length; dim++) {
+                  newCentroid[dim] += point[dim];
+                }
+              }
+              for (let dim = 0; dim < newCentroid.length; dim++) {
+                newCentroid[dim] /= clusterPoints.length;
+              }
+
+              if (
+                !centroids[j] ||
+                euclideanDistance(newCentroid, centroids[j]) > 0.001
+              ) {
+                centroidsChanged = true;
+              }
+              newCentroids.push(newCentroid);
+              if (clusters[j]) clusters[j].centroid = newCentroid;
+            } else {
+              newCentroids.push([...centroids[j]]);
+              if (clusters[j]) clusters[j].centroid = [...centroids[j]];
+            }
+          }
+          centroids = newCentroids;
+
+          if (!centroidsChanged) break;
+        }
+        return clusters.filter((c) => c && c.sentences.length > 0);
+      }
+    </script>
+  </body>
+</html>
